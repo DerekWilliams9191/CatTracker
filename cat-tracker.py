@@ -11,9 +11,25 @@ PROXIMITY = 15  # Morphological closing kernel size (smaller = less aggressive m
 HISTORY = 200  # Number of frames to build background model
 MIN_CONTOUR_AREA = 2000  # Minimum area for valid detection (increased)
 
+def convert_numpy_types(obj):
+    """Convert numpy types to native Python types for JSON serialization"""
+    if isinstance(obj, np.integer):
+        return int(obj)
+    elif isinstance(obj, np.floating):
+        return float(obj)
+    elif isinstance(obj, np.ndarray):
+        return obj.tolist()
+    elif isinstance(obj, dict):
+        return {key: convert_numpy_types(value) for key, value in obj.items()}
+    elif isinstance(obj, list):
+        return [convert_numpy_types(item) for item in obj]
+    return obj
+
 def write_to_queue(data, queue_file="position_queue.txt"):
     try:
         data['timestamp'] = time.time()
+        # Convert numpy types to native Python types
+        data = convert_numpy_types(data)
         line = json.dumps(data) + '\n'
         
         # Simple append - atomic on most systems
