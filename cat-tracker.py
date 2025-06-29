@@ -1,8 +1,31 @@
 import cv2
 import numpy as np
 import os
+import json
+import time
+from pathlib import Path
 
-def detect_cats(cap):
+def write_to_queue(data, queue_file="position_queue.json"):
+    try:
+        if os.path.exists(queue_file):
+            with open(queue_file, 'r') as f:
+                queue_data = json.load(f)
+        else:
+            queue_data = []
+        
+        data['timestamp'] = time.time()
+        queue_data.append(data)
+        
+        # Keep only last 100 entries to prevent file from growing too large
+        if len(queue_data) > 100:
+            queue_data = queue_data[-100:]
+        
+        with open(queue_file, 'w') as f:
+            json.dump(queue_data, f)
+    except Exception as e:
+        print(f"Error writing to queue: {e}")
+
+def detect_cats(cap, use_queue=False):
     model_configs = [
         {
             'weights': 'yolov4.weights',
@@ -168,6 +191,15 @@ def detect_cats(cap):
                     
                     print(f"Cat detected at x={center_x}, y={center_y}, confidence={confidences[i]:.2f}")
                     
+                    if use_queue:
+                        write_to_queue({
+                            'type': 'cat',
+                            'x': center_x,
+                            'y': center_y,
+                            'confidence': confidences[i],
+                            'bbox': [x, y, w, h]
+                        })
+                    
                     color = (0, 255, 0)
                     cv2.rectangle(frame, (x, y), (x + w, y + h), color, 2)
                     
@@ -185,7 +217,7 @@ def detect_cats(cap):
             print(f"Error processing frame: {str(e)}")
             continue
 
-def detect_motion(cap):
+def detect_motion(cap, use_queue=False):
     backSub = cv2.createBackgroundSubtractorMOG2(detectShadows=True)
     
     while True:
@@ -207,6 +239,15 @@ def detect_motion(cap):
                 
                 print(f"Moving object at x={center_x}, y={center_y}, area={area}")
                 
+                if use_queue:
+                    write_to_queue({
+                        'type': 'motion',
+                        'x': center_x,
+                        'y': center_y,
+                        'area': area,
+                        'bbox': [x, y, w, h]
+                    })
+                
                 cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
                 cv2.putText(frame, f'Moving Object', 
                            (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
@@ -218,24 +259,22 @@ def detect_motion(cap):
             break
 
 if __name__ == "__main__":
-    print("Cat Detection Options:")
-    print("1. YOLO-based detection (most accurate, requires model files)")
-    print("2. Motion-based detection (no files needed, detects moving objects)")
+    print("Initializing, this may take a few seconds...")
     
-    choice = input("Enter choice (1/2) or press Enter for motion detection: ").strip()
-    
-    print("Starting camera...")
-
     cap = cv2.VideoCapture(0)
     if not cap.isOpened():
         exit("Error: Could not open camera")
+
+    print("\nCat Detection Options:")
+    print("1. YOLO-based detection (most accurate, requires model files)")
+    print("2. Motion-based detection (no files needed, detects moving objects)")
     
     choice = input("Enter choice (1 for YOLO, 2 for motion): ").strip()
     
     if choice == '1':
-        detect_cats(cap)
+        detect_cats(cap, use_queue=True)
     else:
-        detect_motion(cap)
+        detect_motion(cap, use_queue=True)
 
     cap.release()
     cv2.destroyAllWindows()
