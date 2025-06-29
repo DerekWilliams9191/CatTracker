@@ -124,7 +124,6 @@
         .shape-item {
             display: flex;
             align-items: center;
-            justify-content: space-between;
             padding: 12px;
             margin-bottom: 8px;
             background: rgba(255, 255, 255, 0.05);
@@ -145,6 +144,20 @@
             box-shadow: 0 0 15px rgba(76, 175, 80, 0.3);
         }
 
+        .shape-click-area {
+            width: 40px;
+            height: 100%;
+            flex-shrink: 0;
+        }
+
+        .shape-content {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+        }
+
         .shape-name {
             flex: 1;
             background: transparent;
@@ -152,6 +165,7 @@
             color: white;
             font-size: 14px;
             outline: none;
+            pointer-events: auto;
         }
 
         .shape-name:focus {
@@ -171,6 +185,7 @@
             font-size: 16px;
             line-height: 1;
             transition: all 0.2s ease;
+            flex-shrink: 0;
         }
 
         .delete-btn:hover {
@@ -271,7 +286,7 @@
             </div>
 
             <div class="camera-container">
-                <img id="camera-feed" src="http://localhost:5002/video_feed" alt="Camera Feed">
+                <img id="camera-feed" src="http://localhost:5001/video_feed" alt="Camera Feed">
                 <div class="loading" id="loading">Connecting to camera...</div>
                 <canvas id="canvas"></canvas>
             </div>
@@ -515,13 +530,23 @@
                     const li = document.createElement('li');
                     li.className = `shape-item ${shape.id === this.activeShapeId ? 'active' : ''}`;
                     li.innerHTML = `
-                        <input type="text" class="shape-name" value="${shape.name}" 
-                               onchange="app.renameShape('${shape.id}', this.value)"
-                               onclick="event.stopPropagation()">
-                        <button class="delete-btn" onclick="event.stopPropagation(); app.deleteShape('${shape.id}')" 
-                                title="Delete shape">×</button>
+                        <div class="shape-click-area"></div>
+                        <div class="shape-content">
+                            <input type="text" class="shape-name" value="${shape.name}" 
+                                   onchange="app.renameShape('${shape.id}', this.value)"
+                                   onclick="event.stopPropagation()">
+                            <button class="delete-btn" onclick="event.stopPropagation(); app.deleteShape('${shape.id}')" 
+                                    title="Delete shape">×</button>
+                        </div>
                     `;
-                    li.addEventListener('click', () => this.selectShape(shape.id));
+                    
+                    // Add click handler to the entire item
+                    li.addEventListener('click', (e) => {
+                        if (!e.target.closest('.shape-name') && !e.target.closest('.delete-btn')) {
+                            this.selectShape(shape.id);
+                        }
+                    });
+                    
                     shapeList.appendChild(li);
                 });
             }
@@ -529,6 +554,7 @@
             updateUI() {
                 const newShapeBtn = document.getElementById('new-shape-btn');
                 newShapeBtn.classList.toggle('active', this.isDrawing);
+                this.updateShapeList();
             }
 
             render() {
@@ -539,20 +565,37 @@
 
                     const isActive = shape.id === this.activeShapeId;
                     
-                    // Draw shape
-                    this.ctx.beginPath();
-                    this.ctx.strokeStyle = isActive ? '#4CAF50' : '#66BB6A';
-                    this.ctx.fillStyle = isActive ? 'rgba(76, 175, 80, 0.2)' : 'rgba(102, 187, 106, 0.15)';
-                    this.ctx.lineWidth = 2;
-
-                    if (shape.points.length === 1) {
-                        // Single point
-                        this.ctx.arc(shape.points[0].x, shape.points[0].y, 4, 0, 2 * Math.PI);
-                        this.ctx.fill();
+                    // Draw shape outline and fill
+                    if (shape.points.length >= 2) {
+                        this.ctx.beginPath();
+                        this.ctx.moveTo(shape.points[0].x, shape.points[0].y);
+                        
+                        for (let i = 1; i < shape.points.length; i++) {
+                            this.ctx.lineTo(shape.points[i].x, shape.points[i].y);
+                        }
+                        
+                        // Close the path if we have 3+ points
+                        if (shape.points.length >= 3) {
+                            this.ctx.closePath();
+                            
+                            // Fill the shape
+                            this.ctx.fillStyle = isActive ? 'rgba(76, 175, 80, 0.5)' : 'rgba(76, 175, 80, 0.3)';
+                            this.ctx.fill();
+                        }
+                        
+                        // Draw the outline
+                        this.ctx.strokeStyle = isActive ? '#4CAF50' : '#4CAF50';
+                        this.ctx.lineWidth = isActive ? 3 : 2;
                         this.ctx.stroke();
+                    } else if (shape.points.length === 1) {
+                        // Single point - draw as a circle
+                        this.ctx.beginPath();
+                        this.ctx.arc(shape.points[0].x, shape.points[0].y, 4, 0, 2 * Math.PI);
+                        this.ctx.fillStyle = isActive ? '#4CAF50' : '#4CAF50';
+                        this.ctx.fill();
                     }
 
-                    // Draw edit points for active shape
+                    // Draw edit points only for active shape
                     if (isActive) {
                         shape.points.forEach(point => {
                             this.ctx.beginPath();
@@ -582,7 +625,7 @@
                         }))
                     };
 
-                    const response = await fetch('http://localhost:5002/save_shapes', {
+                    const response = await fetch('http://localhost:5001/save_shapes', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
