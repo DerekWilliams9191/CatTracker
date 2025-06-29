@@ -39,15 +39,6 @@ def write_to_queue(data, queue_file="position_queue.txt"):
     except Exception as e:
         print(f"Error writing to queue: {e}")
 
-def draw_crosshair(frame, x, y, color=(0, 0, 255), size=20, thickness=2):
-    """Draw a crosshair marker at the specified position"""
-    # Horizontal line
-    cv2.line(frame, (x - size, y), (x + size, y), color, thickness)
-    # Vertical line
-    cv2.line(frame, (x, y - size), (x, y + size), color, thickness)
-    # Optional: Add a small circle at the center
-    cv2.circle(frame, (x, y), 3, color, -1)
-
 def merge_nearby_boxes(boxes, distance_threshold=PROXIMITY_THRESHOLD):
     """Improved merging of bounding boxes that are close to each other"""
     if not boxes:
@@ -128,7 +119,6 @@ def detect_motion(cap, use_queue=False):
     )
     
     last_queue_write = 0
-    last_position = None
     
     # Morphological operations kernels - adjusted sizes
     kernel_open = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))  # Slightly larger for better noise removal
@@ -192,9 +182,6 @@ def detect_motion(cap, use_queue=False):
                 
                 # Additional size filter after merging
                 if area > MIN_CONTOUR_AREA:
-                    # Update last position for marker
-                    last_position = (center_x, center_y)
-                    
                     print(f"Moving object at x={center_x}, y={center_y}, area={area}")
                     
                     # Throttle queue writes
@@ -208,26 +195,15 @@ def detect_motion(cap, use_queue=False):
                             'bbox': [x, y, w, h]
                         })
                         last_queue_write = current_time
-                    
-                    # Draw detection rectangle
-                    cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
-                    cv2.putText(frame, f'Moving Object (Area: {area})', 
-                               (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
         
-        # Draw crosshair marker at the last detected position
-        if last_position:
-            draw_crosshair(frame, last_position[0], last_position[1], color=(0, 0, 255), size=25, thickness=3)
-            pos_text = f"Position: ({last_position[0]}, {last_position[1]})"
-            cv2.putText(frame, pos_text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
-        
-        cv2.imshow('Motion Detection', frame)
+        # Only show the foreground mask window (removed the main frame display)
         cv2.imshow('Foreground Mask', fgMask)
         
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
 
 if __name__ == "__main__":
-    print("Initializing, this may take a few seconds...")
+    print("Initializing motion detector, this may take a few seconds...")
     
     cap = cv2.VideoCapture(0)
     if not cap.isOpened():
