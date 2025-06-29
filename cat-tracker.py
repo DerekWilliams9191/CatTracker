@@ -3,25 +3,16 @@ import numpy as np
 import os
 import json
 import time
-from pathlib import Path
 
-def write_to_queue(data, queue_file="position_queue.json"):
+def write_to_queue(data, queue_file="position_queue.txt"):
     try:
-        if os.path.exists(queue_file):
-            with open(queue_file, 'r') as f:
-                queue_data = json.load(f)
-        else:
-            queue_data = []
-        
         data['timestamp'] = time.time()
-        queue_data.append(data)
+        line = json.dumps(data) + '\n'
         
-        # Keep only last 100 entries to prevent file from growing too large
-        if len(queue_data) > 100:
-            queue_data = queue_data[-100:]
-        
-        with open(queue_file, 'w') as f:
-            json.dump(queue_data, f)
+        # Simple append - atomic on most systems
+        with open(queue_file, 'a') as f:
+            f.write(line)
+            
     except Exception as e:
         print(f"Error writing to queue: {e}")
 
@@ -120,6 +111,8 @@ def detect_cats(cap, use_queue=False):
     else:
         output_layers = [layer_names[i[0] - 1] for i in unconnected]
     
+    last_queue_write = 0  # Throttle queue writes
+    
     while True:
         ret, frame = cap.read()
         if not ret:
@@ -191,7 +184,9 @@ def detect_cats(cap, use_queue=False):
                     
                     print(f"Cat detected at x={center_x}, y={center_y}, confidence={confidences[i]:.2f}")
                     
-                    if use_queue:
+                    # Throttle queue writes to avoid overwhelming
+                    current_time = time.time()
+                    if use_queue and (current_time - last_queue_write) > 0.1:  # Max 10 writes per second
                         write_to_queue({
                             'type': 'cat',
                             'x': center_x,
@@ -199,6 +194,7 @@ def detect_cats(cap, use_queue=False):
                             'confidence': confidences[i],
                             'bbox': [x, y, w, h]
                         })
+                        last_queue_write = current_time
                     
                     color = (0, 255, 0)
                     cv2.rectangle(frame, (x, y), (x + w, y + h), color, 2)
@@ -219,6 +215,7 @@ def detect_cats(cap, use_queue=False):
 
 def detect_motion(cap, use_queue=False):
     backSub = cv2.createBackgroundSubtractorMOG2(detectShadows=True)
+    last_queue_write = 0  # Throttle queue writes
     
     while True:
         ret, frame = cap.read()
@@ -239,7 +236,9 @@ def detect_motion(cap, use_queue=False):
                 
                 print(f"Moving object at x={center_x}, y={center_y}, area={area}")
                 
-                if use_queue:
+                # Throttle queue writes to avoid overwhelming
+                current_time = time.time()
+                if use_queue and (current_time - last_queue_write) > 0.1:  # Max 10 writes per second
                     write_to_queue({
                         'type': 'motion',
                         'x': center_x,
@@ -247,6 +246,7 @@ def detect_motion(cap, use_queue=False):
                         'area': area,
                         'bbox': [x, y, w, h]
                     })
+                    last_queue_write = current_time
                 
                 cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
                 cv2.putText(frame, f'Moving Object', 
