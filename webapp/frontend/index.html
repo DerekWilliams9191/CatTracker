@@ -139,9 +139,9 @@
         }
 
         .shape-item.active {
-            background: linear-gradient(135deg, rgba(76, 175, 80, 0.3), rgba(69, 160, 73, 0.3));
-            border-color: #4CAF50;
-            box-shadow: 0 0 15px rgba(76, 175, 80, 0.3);
+            background: linear-gradient(135deg, rgba(255, 152, 0, 0.3), rgba(245, 124, 0, 0.3));
+            border-color: #FF9800;
+            box-shadow: 0 0 15px rgba(255, 152, 0, 0.3);
         }
 
         .shape-click-area {
@@ -386,11 +386,22 @@
             }
 
             handleCanvasClick(e) {
-                if (!this.isDrawing || this.dragPoint) return;
-                
                 const rect = this.canvas.getBoundingClientRect();
                 const x = e.clientX - rect.left;
                 const y = e.clientY - rect.top;
+                
+                // If we're dragging, don't handle click
+                if (this.dragPoint) return;
+
+                // Check if we clicked on any shape (for selection)
+                const clickedShape = this.getShapeAt(x, y);
+                if (clickedShape && clickedShape.id !== this.activeShapeId) {
+                    this.selectShape(clickedShape.id);
+                    return;
+                }
+
+                // If we're not drawing, clicking on empty space should do nothing
+                if (!this.isDrawing) return;
                 
                 const activeShape = this.getActiveShape();
                 if (!activeShape) return;
@@ -415,6 +426,41 @@
                 // Add new point
                 activeShape.points.push({ x, y });
                 this.render();
+            }
+
+            // New method to find which shape was clicked
+            getShapeAt(x, y) {
+                // Check shapes in reverse order (topmost first)
+                for (let i = this.shapes.length - 1; i >= 0; i--) {
+                    const shape = this.shapes[i];
+                    if (shape.points.length < 3) continue; // Skip incomplete shapes
+                    
+                    // Use point-in-polygon algorithm
+                    if (this.isPointInPolygon(x, y, shape.points)) {
+                        return shape;
+                    }
+                }
+                return null;
+            }
+
+            // Point-in-polygon algorithm (ray casting)
+            isPointInPolygon(x, y, points) {
+                let inside = false;
+                let j = points.length - 1;
+                
+                for (let i = 0; i < points.length; i++) {
+                    const xi = points[i].x;
+                    const yi = points[i].y;
+                    const xj = points[j].x;
+                    const yj = points[j].y;
+                    
+                    if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)) {
+                        inside = !inside;
+                    }
+                    j = i;
+                }
+                
+                return inside;
             }
 
             handleMouseDown(e) {
@@ -450,6 +496,8 @@
                     const activeShape = this.getActiveShape();
                     if (activeShape && this.getPointAt(x, y, activeShape) !== -1) {
                         this.canvas.style.cursor = 'grab';
+                    } else if (this.getShapeAt(x, y)) {
+                        this.canvas.style.cursor = 'pointer';
                     } else {
                         this.canvas.style.cursor = this.isDrawing ? 'crosshair' : 'default';
                     }
@@ -479,7 +527,20 @@
                 }
                 
                 this.dragPoint = null;
-                this.canvas.style.cursor = this.isDrawing ? 'crosshair' : 'default';
+                
+                // Update cursor based on current position
+                const rect = this.canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                const activeShape = this.getActiveShape();
+                
+                if (activeShape && this.getPointAt(x, y, activeShape) !== -1) {
+                    this.canvas.style.cursor = 'grab';
+                } else if (this.getShapeAt(x, y)) {
+                    this.canvas.style.cursor = 'pointer';
+                } else {
+                    this.canvas.style.cursor = this.isDrawing ? 'crosshair' : 'default';
+                }
             }
 
             getPointAt(x, y, shape) {
@@ -578,20 +639,20 @@
                         if (shape.points.length >= 3) {
                             this.ctx.closePath();
                             
-                            // Fill the shape
-                            this.ctx.fillStyle = isActive ? 'rgba(76, 175, 80, 0.5)' : 'rgba(76, 175, 80, 0.3)';
+                            // Fill the shape - active shape uses orange color
+                            this.ctx.fillStyle = isActive ? 'rgba(255, 152, 0, 0.5)' : 'rgba(76, 175, 80, 0.3)';
                             this.ctx.fill();
                         }
                         
-                        // Draw the outline
-                        this.ctx.strokeStyle = isActive ? '#4CAF50' : '#4CAF50';
+                        // Draw the outline - active shape uses orange color
+                        this.ctx.strokeStyle = isActive ? '#FF9800' : '#4CAF50';
                         this.ctx.lineWidth = isActive ? 3 : 2;
                         this.ctx.stroke();
                     } else if (shape.points.length === 1) {
                         // Single point - draw as a circle
                         this.ctx.beginPath();
                         this.ctx.arc(shape.points[0].x, shape.points[0].y, 4, 0, 2 * Math.PI);
-                        this.ctx.fillStyle = isActive ? '#4CAF50' : '#4CAF50';
+                        this.ctx.fillStyle = isActive ? '#FF9800' : '#4CAF50';
                         this.ctx.fill();
                     }
 
