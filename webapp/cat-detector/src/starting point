@@ -1,0 +1,404 @@
+// src/app/motion/page.tsx
+'use client';
+
+import { useState, useEffect, useRef } from 'react';
+import { X, Plus, Save, Upload } from 'lucide-react';
+
+// Constants
+const AUTOSAVE_INTERVAL = 5000; // 5 seconds
+const ACTIVE_COLOR = '#3B82F6'; // Blue
+const INACTIVE_COLOR = '#6B7280'; // Gray
+const FILL_OPACITY = 0.5;
+const POINT_RADIUS = 6;
+const CAMERA_IMAGE_URL = '/api/camera/live'; // Replace with actual camera feed
+
+// Types
+interface Point {
+  x: number;
+  y: number;
+}
+
+interface Shape {
+  id: string;
+  name: string;
+  points: Point[];
+  isActive: boolean;
+}
+
+interface SaveStatus {
+  status: 'saved' | 'saving' | 'unsaved';
+  lastSaved?: Date;
+}
+
+export default function MotionPage() {
+  const [shapes, setShapes] = useState<Shape[]>([]);
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [currentShapeId, setCurrentShapeId] = useState<string | null>(null);
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>({ status: 'saved' });
+  const [editingNameId, setEditingNameId] = useState<string | null>(null);
+  
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const autosaveTimeoutRef = useRef<NodeJS.Timeout>();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Load shapes on component mount
+  useEffect(() => {
+    loadShapesFromServer();
+  }, []);
+
+  // Autosave functionality
+  useEffect(() => {
+    if (saveStatus.status === 'unsaved') {
+      // Clear existing timeout
+      if (autosaveTimeoutRef.current) {
+        clearTimeout(autosaveTimeoutRef.current);
+      }
+
+      // Set new timeout
+      autosaveTimeoutRef.current = setTimeout(() => {
+        saveToServer();
+      }, AUTOSAVE_INTERVAL);
+
+      setSaveStatus({ status: 'saving' });
+    }
+
+    return () => {
+      if (autosaveTimeoutRef.current) {
+        clearTimeout(autosaveTimeoutRef.current);
+      }
+    };
+  }, [shapes]);
+
+  // Canvas drawing effect
+  useEffect(() => {
+    drawCanvas();
+  }, [shapes, currentShapeId]);
+
+  const generateId = () => Math.random().toString(36).substr(2, 9);
+
+  const loadShapesFromServer = async () => {
+    try {
+      const response = await fetch('/api/shapes');
+      if (response.ok) {
+        const data = await response.json();
+        setShapes(data.shapes || []);
+      }
+    } catch (error) {
+      console.error('Failed to load shapes:', error);
+    }
+  };
+
+  const saveToServer = async () => {
+    try {
+      const response = await fetch('/api/shapes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ shapes }),
+      });
+      
+      if (response.ok) {
+        setSaveStatus({ status: 'saved', lastSaved: new Date() });
+      }
+    } catch (error) {
+      console.error('Failed to save shapes:', error);
+    }
+  };
+
+  const addShape = () => {
+    const newShape: Shape = {
+      id: generateId(),
+      name: `Shape ${shapes.length + 1}`,
+      points: [],
+      isActive: true,
+    };
+
+    // Deactivate all other shapes
+    const updatedShapes = shapes.map(shape => ({ ...shape, isActive: false }));
+    setShapes([...updatedShapes, newShape]);
+    setCurrentShapeId(newShape.id);
+    setIsDrawing(true);
+    setSaveStatus({ status: 'unsaved' });
+  };
+
+  const deleteShape = (id: string) => {
+    setShapes(shapes.filter(shape => shape.id !== id));
+    if (currentShapeId === id) {
+      setCurrentShapeId(null);
+      setIsDrawing(false);
+    }
+    setSaveStatus({ status: 'unsaved' });
+  };
+
+  const activateShape = (id: string) => {
+    setShapes(shapes.map(shape => ({
+      ...shape,
+      isActive: shape.id === id,
+    })));
+    setCurrentShapeId(id);
+    setSaveStatus({ status: 'unsaved' });
+  };
+
+  const updateShapeName = (id: string, newName: string) => {
+    setShapes(shapes.map(shape =>
+      shape.id === id ? { ...shape, name: newName } : shape
+    ));
+    setSaveStatus({ status: 'unsaved' });
+  };
+
+  const handleCanvasClick = (event: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!isDrawing || !currentShapeId) return;
+
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const x = (event.clientX - rect.left) / rect.width;
+    const y = (event.clientY - rect.top) / rect.height;
+
+    const newPoint: Point = { x, y };
+
+    setShapes(shapes.map(shape => {
+      if (shape.id === currentShapeId) {
+        return { ...shape, points: [...shape.points, newPoint] };
+      }
+      return shape;
+    }));
+
+    setSaveStatus({ status: 'unsaved' });
+  };
+
+  const finishDrawing = () => {
+    setIsDrawing(false);
+    setCurrentShapeId(null);
+  };
+
+  const drawCanvas = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // Clear canvas
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Draw shapes
+    shapes.forEach(shape => {
+      if (shape.points.length < 2) return;
+
+      const color = shape.isActive ? ACTIVE_COLOR : INACTIVE_COLOR;
+      
+      // Draw fill
+      ctx.fillStyle = color + Math.floor(FILL_OPACITY * 255).toString(16).padStart(2, '0');
+      ctx.beginPath();
+      ctx.moveTo(shape.points[0].x * canvas.width, shape.points[0].y * canvas.height);
+      
+      for (let i = 1; i < shape.points.length; i++) {
+        ctx.lineTo(shape.points[i].x * canvas.width, shape.points[i].y * canvas.height);
+      }
+      
+      ctx.closePath();
+      ctx.fill();
+
+      // Draw outline
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // Draw points for active shape
+      if (shape.isActive) {
+        ctx.fillStyle = '#FFFFFF';
+        shape.points.forEach(point => {
+          ctx.beginPath();
+          ctx.arc(
+            point.x * canvas.width,
+            point.y * canvas.height,
+            POINT_RADIUS,
+            0,
+            2 * Math.PI
+          );
+          ctx.fill();
+          ctx.strokeStyle = color;
+          ctx.lineWidth = 2;
+          ctx.stroke();
+        });
+      }
+    });
+  };
+
+  const downloadShapes = () => {
+    const dataStr = JSON.stringify({ shapes }, null, 2);
+    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(dataBlob);
+    
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'motion-shapes.json';
+    link.click();
+    
+    URL.revokeObjectURL(url);
+  };
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = JSON.parse(e.target?.result as string);
+        if (data.shapes && Array.isArray(data.shapes)) {
+          setShapes(data.shapes);
+          setSaveStatus({ status: 'unsaved' });
+        }
+      } catch (error) {
+        console.error('Invalid JSON file:', error);
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-100 font-jacquard-12">
+      {/* Header */}
+      <header className="bg-white shadow-sm border-b">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center py-4">
+            <h1 className="text-2xl font-jacquard-24 text-gray-900">Cat Detector</h1>
+            <nav className="flex space-x-8">
+              <a href="/" className="text-gray-500 hover:text-gray-700">home</a>
+              <a href="/live" className="text-gray-500 hover:text-gray-700">live</a>
+              <a href="/motion" className="text-gray-900 border-b-2 border-gray-900">motion</a>
+            </nav>
+          </div>
+        </div>
+      </header>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+          {/* Camera View */}
+          <div className="lg:col-span-3">
+            <div className="bg-white rounded-lg shadow-sm p-6">
+              <h2 className="text-xl font-jacquard-24 text-gray-900 mb-4">Camera</h2>
+              <div className="relative">
+                <div className="aspect-video bg-gray-200 rounded-lg overflow-hidden relative">
+                  {/* Camera feed placeholder */}
+                  <img 
+                    src="/api/placeholder/800/450" 
+                    alt="Camera feed" 
+                    className="w-full h-full object-cover"
+                  />
+                  {/* Canvas overlay */}
+                  <canvas
+                    ref={canvasRef}
+                    width={800}
+                    height={450}
+                    className="absolute inset-0 w-full h-full cursor-crosshair"
+                    onClick={handleCanvasClick}
+                  />
+                </div>
+                {isDrawing && (
+                  <button
+                    onClick={finishDrawing}
+                    className="absolute bottom-4 right-4 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+                  >
+                    Finish Shape
+                  </button>
+                )}
+                
+                {/* Autosave indicator */}
+                <div className="absolute top-4 right-4 text-sm text-gray-600">
+                  {saveStatus.status === 'saved' && 'autosave (saved)'}
+                  {saveStatus.status === 'saving' && 'autosave in progress...'}
+                  {saveStatus.status === 'unsaved' && 'unsaved changes'}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Shapes Panel */}
+          <div className="lg:col-span-1">
+            <div className="bg-white rounded-lg shadow-sm p-6">
+              <h2 className="text-xl font-jacquard-24 text-gray-900 mb-4">Shapes</h2>
+              
+              {/* Shapes List */}
+              <div className="space-y-2 mb-6">
+                {shapes.map(shape => (
+                  <div key={shape.id} className="flex items-center space-x-2">
+                    <button
+                      onClick={() => activateShape(shape.id)}
+                      className={`w-4 h-4 rounded-full border-2 ${
+                        shape.isActive 
+                          ? 'bg-blue-600 border-blue-600' 
+                          : 'border-gray-300'
+                      }`}
+                    />
+                    {editingNameId === shape.id ? (
+                      <input
+                        type="text"
+                        value={shape.name}
+                        onChange={(e) => updateShapeName(shape.id, e.target.value)}
+                        onBlur={() => setEditingNameId(null)}
+                        onKeyPress={(e) => e.key === 'Enter' && setEditingNameId(null)}
+                        className="flex-1 text-sm border-b border-gray-300 focus:outline-none focus:border-blue-600"
+                        autoFocus
+                      />
+                    ) : (
+                      <button
+                        onClick={() => setEditingNameId(shape.id)}
+                        className="flex-1 text-left text-sm text-gray-700 hover:text-gray-900"
+                      >
+                        {shape.name}
+                      </button>
+                    )}
+                    <button
+                      onClick={() => deleteShape(shape.id)}
+                      className="text-gray-400 hover:text-red-600"
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              <button
+                onClick={addShape}
+                className="w-full bg-gray-200 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-300 flex items-center justify-center space-x-2 mb-6"
+              >
+                <Plus size={16} />
+                <span>Add Shape</span>
+              </button>
+
+              {/* Save Controls */}
+              <div className="space-y-2">
+                <button
+                  onClick={downloadShapes}
+                  className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 flex items-center justify-center space-x-2"
+                >
+                  <Save size={16} />
+                  <span>save (local)</span>
+                </button>
+                
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-full bg-gray-600 text-white py-2 px-4 rounded-lg hover:bg-gray-700 flex items-center justify-center space-x-2"
+                >
+                  <Upload size={16} />
+                  <span>upload</span>
+                </button>
+                
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".json"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
