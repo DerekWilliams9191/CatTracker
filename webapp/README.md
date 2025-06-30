@@ -1,116 +1,40 @@
-# Camera Shape Drawing App
+# Cat Detector - Motion Detection System
 
-A web application that streams live camera feed and allows users to draw and edit shapes on top of the video stream.
+## Overview
+
+The Cat Detector is a web-based application that allows users to define motion detection regions on a live camera feed by drawing custom shapes directly on the video stream.
 
 ## Features
 
-- Live camera feed streaming
-- Interactive shape drawing (polygons)
-- Shape editing with draggable points
-- Shape management (rename, delete)
-- Save shapes as JSON (remote and local)
-- Upload existing shape files
-- Responsive design with accessibility features
-
-## File Structure
-
-```
-camera-shape-app/
-├── backend/
-│   ├── app.py              # Flask server with camera streaming
-│   ├── requirements.txt    # Python dependencies
-│   └── shapes/            # Directory for saved shape files
-├── frontend/
-│   └── index.html         # Complete web application
-└── README.md              # This file
-```
-
-## Installation & Setup
-
-The backend will start on `http://localhost:5000`
-
-### Frontend Setup
-
-1. Open the `frontend/index.html` file in a modern web browser
-2. Or serve it using a simple HTTP server:
-```bash
-cd frontend
-python -m http.server 8080
-```
-Then visit `http://localhost:8080`
-
-## Usage
-
-### Drawing Shapes
-1. Click "New Shape" to start drawing
-2. Click on the camera feed to add points:
-   - 1st click: Creates a point
-   - 2nd click: Creates a line
-   - 3rd click: Creates a polygon
-   - Additional clicks: Add more points to the polygon
-
-### Editing Shapes
-- Click on a shape name in the sidebar to make it active
-- Drag the circular points to reshape
-- Click on a point (without dragging) to delete it
-- Only the active shape shows its edit points
-
 ### Shape Management
-- Double-click shape names to rename them
-- Click the delete button (×) to remove shapes
-- Use the sidebar to switch between shapes
+- Click "Add Shape" to create a new detection region
+- Click on the camera feed to place points and create polygon shapes
+- Click on shapes or sidebar circles to activate/deactivate them
+- Click on shape names in the sidebar to rename them
+- Delete shapes using the X button
 
-### Saving & Loading
-- **Save (Remote)**: Saves to the backend server
-- **Save (Device)**: Downloads JSON file to your device
-- **Upload**: Load shapes from a JSON file
+### Visual Indicators
+- Active shapes appear blue with white corner points and filled circles in the sidebar
+- Inactive shapes appear gray without corner points and empty circles in the sidebar
+- All shapes have solid outlines with 50% opacity fills
 
-## Technical Details
+### Saving and Loading
+- Automatically saves to server every 5 seconds
+- Shows save status: "saved", "autosave in progress", or when changes are unsaved
+- Save button downloads shapes as JSON file to local computer
+- Upload button sends JSON file to server and overwrites current shapes
+- Automatically loads shapes from server when the site launches
 
-### Backend API Endpoints
-- `GET /video_feed` - Camera stream endpoint
-- `POST /save_shapes` - Save shapes to server
-- `GET /shapes` - Retrieve saved shapes
+## How to Use
 
-### Shape Data Format
-Shapes are stored as JSON with the following structure:
-```json
-{
-  "shapes": [
-    {
-      "id": "unique-id",
-      "name": "Shape Name",
-      "points": [
-        {"x": 100, "y": 150},
-        {"x": 200, "y": 150},
-        {"x": 150, "y": 250}
-      ]
-    }
-  ]
-}
+1. Click "Add Shape" to start creating a detection region
+2. Click points on the camera feed to define the shape boundaries
+3. Click "Finish Shape" when done placing points
+4. Use the sidebar to manage your shapes - activate, rename, or delete them
+5. Your shapes are automatically saved to the server every 5 seconds
+
+
+## Run the Development Server
+```bash
+npm run dev
 ```
-
-## Troubleshooting
-
-### Camera Not Working
-- Ensure your camera is not being used by another application
-- Check browser permissions for camera access
-- Try refreshing the page
-
-### Backend Connection Issues
-- Verify the Flask server is running on port 5000
-- Check that no firewall is blocking the connection
-- Ensure the backend URL in the frontend matches your setup
-
-### CORS Issues
-- The backend includes CORS headers for development
-- For production, configure CORS properly for your domain
-
-## Browser Compatibility
-- Chrome/Chromium 60+
-- Firefox 55+
-- Safari 11+
-- Edge 79+
-
-## License
-This project is provided as-is for educational and development purposes.
