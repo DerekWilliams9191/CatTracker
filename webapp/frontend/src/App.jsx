@@ -1,4 +1,3 @@
-// src/App.jsx
 import React from 'react';
 import Header from './components/Header';
 import Camera from './components/Camera';
@@ -22,6 +21,8 @@ function App() {
     deleteShape,
     renameShape,
     handleCanvasClick,
+    handleShapePointDrag,
+    handleShapePointClick,
     downloadShapes,
     uploadShapes
   } = useShapes();
@@ -39,6 +40,8 @@ function App() {
             activeShapeId={activeShapeId}
             isCreatingShape={isCreatingShape}
             onCanvasClick={handleCanvasClick}
+            onShapePointDrag={handleShapePointDrag}
+            onShapePointClick={handleShapePointClick}
             onToggleShapeActive={toggleShapeActive}
           />
           

@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 
 // Constants
 const COLORS = {
-  ACTIVE_BLUE: '#3B82F6'
+  ACTIVE_FILL: '#A3A3A3', // Gray fill for active
+  INACTIVE_FILL: 'transparent'
 };
 
 const CIRCLE_SIZE = 'w-4 h-4';
@@ -38,7 +39,7 @@ function ShapeItem({ shape, onToggleActive, onDelete, onRename }) {
   };
 
   const getCircleStyle = () => ({
-    backgroundColor: shape.active ? COLORS.ACTIVE_BLUE : 'transparent'
+    backgroundColor: shape.active ? COLORS.ACTIVE_FILL : COLORS.INACTIVE_FILL
   });
 
   return (

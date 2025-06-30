@@ -15,7 +15,14 @@ export function useShapes() {
     const initializeShapes = async () => {
       try {
         const data = await loadShapes();
-        setShapes(data.shapes || []);
+        if (data.shapes && data.shapes.length > 0) {
+          setShapes(data.shapes);
+          // Set the first active shape as active, or find an existing active shape
+          const activeShape = data.shapes.find(s => s.active);
+          if (activeShape) {
+            setActiveShapeId(activeShape.id);
+          }
+        }
       } catch (error) {
         console.error('Failed to load shapes:', error);
       }
@@ -32,6 +39,7 @@ export function useShapes() {
       active: true
     };
     
+    // Deactivate all other shapes
     setShapes(prev => [...prev.map(s => ({ ...s, active: false })), newShape]);
     setActiveShapeId(newShape.id);
     setIsCreatingShape(true);
@@ -43,7 +51,12 @@ export function useShapes() {
       active: shape.id === shapeId
     })));
     setActiveShapeId(shapeId);
-    setIsCreatingShape(false);
+    
+    // If we're switching to a shape that already has points, we can continue adding to it
+    const targetShape = shapes.find(s => s.id === shapeId);
+    if (targetShape) {
+      setIsCreatingShape(true); // Always allow adding more points
+    }
   };
 
   const deleteShape = (shapeId) => {
@@ -63,13 +76,32 @@ export function useShapes() {
   };
 
   const handleCanvasClick = (point) => {
-    if (!activeShapeId) return;
+    if (!activeShapeId || !isCreatingShape) return;
 
     setShapes(prev => prev.map(shape => 
       shape.id === activeShapeId 
         ? { ...shape, points: [...shape.points, point] }
         : shape
     ));
+  };
+
+  const handleShapePointDrag = (shapeId, pointIndex, newPosition) => {
+    setShapes(prev => prev.map(shape => {
+      if (shape.id !== shapeId) return shape;
+      
+      const newPoints = [...shape.points];
+      newPoints[pointIndex] = newPosition;
+      return { ...shape, points: newPoints };
+    }));
+  };
+
+  const handleShapePointClick = (shapeId, pointIndex) => {
+    setShapes(prev => prev.map(shape => {
+      if (shape.id !== shapeId) return shape;
+      
+      const newPoints = shape.points.filter((_, index) => index !== pointIndex);
+      return { ...shape, points: newPoints };
+    }));
   };
 
   const downloadShapes = () => {
@@ -90,8 +122,24 @@ export function useShapes() {
         const data = JSON.parse(e.target.result);
         if (data.shapes && Array.isArray(data.shapes)) {
           setShapes(data.shapes);
-          setActiveShapeId(null);
-          setIsCreatingShape(false);
+          
+          // Find active shape or set first shape as active
+          const activeShape = data.shapes.find(s => s.active);
+          if (activeShape) {
+            setActiveShapeId(activeShape.id);
+            setIsCreatingShape(true);
+          } else if (data.shapes.length > 0) {
+            const firstShape = data.shapes[0];
+            setShapes(prev => prev.map(s => ({
+              ...s,
+              active: s.id === firstShape.id
+            })));
+            setActiveShapeId(firstShape.id);
+            setIsCreatingShape(true);
+          } else {
+            setActiveShapeId(null);
+            setIsCreatingShape(false);
+          }
         } else {
           throw new Error('Invalid file format');
         }
@@ -112,6 +160,8 @@ export function useShapes() {
     deleteShape,
     renameShape,
     handleCanvasClick,
+    handleShapePointDrag,
+    handleShapePointClick,
     downloadShapes,
     uploadShapes
   };

@@ -1,31 +1,31 @@
-// src/components/Camera.jsx - Snapshot Mode Alternative
 import React, { useRef, useEffect, useState } from 'react';
 import ShapeOverlay from './ShapeOverlay';
 
 // Constants
-const CANVAS_DIMENSIONS = {
-  WIDTH: 800,
-  HEIGHT: 600
-};
-
 const SECTION_TITLE = 'Camera';
 const CAMERA_SNAPSHOT_URL = '/api/camera/snapshot';
+const CAMERA_STATUS_URL = '/api/camera/status';
 const REFRESH_INTERVAL = 200; // Refresh every 200ms
 
 function Camera({ 
   shapes, 
   activeShapeId, 
   isCreatingShape, 
-  onCanvasClick, 
+  onCanvasClick,
+  onShapePointDrag,
+  onShapePointClick,
   onToggleShapeActive 
 }) {
   const canvasRef = useRef(null);
   const imgRef = useRef(null);
+  const containerRef = useRef(null);
   const [streamError, setStreamError] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [cameraDimensions, setCameraDimensions] = useState({ width: 640, height: 480 });
   const intervalRef = useRef(null);
 
   useEffect(() => {
+    getCameraDimensions();
     startSnapshotLoop();
     
     return () => {
@@ -34,6 +34,21 @@ function Camera({
       }
     };
   }, []);
+
+  const getCameraDimensions = async () => {
+    try {
+      const response = await fetch(CAMERA_STATUS_URL);
+      const status = await response.json();
+      if (status.available) {
+        setCameraDimensions({
+          width: status.width,
+          height: status.height
+        });
+      }
+    } catch (error) {
+      console.error('Failed to get camera dimensions:', error);
+    }
+  };
 
   const startSnapshotLoop = () => {
     // Initial load
@@ -55,6 +70,14 @@ function Camera({
   const handleImageLoad = () => {
     setIsLoading(false);
     setStreamError(null);
+    
+    // Update dimensions from the actual loaded image
+    if (imgRef.current) {
+      setCameraDimensions({
+        width: imgRef.current.naturalWidth,
+        height: imgRef.current.naturalHeight
+      });
+    }
   };
 
   const handleImageError = () => {
@@ -76,23 +99,36 @@ function Camera({
   const retryConnection = () => {
     setIsLoading(true);
     setStreamError(null);
+    getCameraDimensions();
     startSnapshotLoop();
   };
 
   return (
     <>
       <h2 className="font-jacquard-12 text-2xl text-text-gray mb-4">
-        {SECTION_TITLE} (Snapshot Mode)
+        {SECTION_TITLE}
       </h2>
       
-      <div className="relative bg-black rounded-lg overflow-hidden">
+      <div 
+        ref={containerRef}
+        className="relative bg-black rounded-lg overflow-hidden"
+        style={{ 
+          width: `${cameraDimensions.width}px`, 
+          height: `${cameraDimensions.height}px`,
+          maxWidth: '100%'
+        }}
+      >
         <canvas
           ref={canvasRef}
-          width={CANVAS_DIMENSIONS.WIDTH}
-          height={CANVAS_DIMENSIONS.HEIGHT}
-          className="w-full h-auto cursor-crosshair absolute inset-0 z-10"
+          width={cameraDimensions.width}
+          height={cameraDimensions.height}
+          className="absolute inset-0 z-10 cursor-crosshair"
           onClick={handleCanvasClick}
-          style={{ backgroundColor: 'transparent' }}
+          style={{ 
+            backgroundColor: 'transparent',
+            width: '100%',
+            height: '100%'
+          }}
         />
         
         {isLoading && (
@@ -116,19 +152,22 @@ function Camera({
         <img
           ref={imgRef}
           alt="Camera Feed"
-          className="w-full h-full object-cover"
+          className="w-full h-full block"
           onLoad={handleImageLoad}
           onError={handleImageError}
           style={{ 
             width: '100%', 
             height: '100%',
-            objectFit: 'cover'
+            display: 'block'
           }}
         />
         
         <ShapeOverlay
           shapes={shapes}
+          activeShapeId={activeShapeId}
           onToggleShapeActive={onToggleShapeActive}
+          onShapePointDrag={onShapePointDrag}
+          onShapePointClick={onShapePointClick}
         />
       </div>
     </>
