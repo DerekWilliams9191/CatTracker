@@ -1,23 +1,90 @@
-# Motion Detector - React App
+# Motion Detector Project Setup
 
-A React application for defining motion detection regions with an intuitive drawing interface.
+## Project Structure
+```
+motion-detector/
+├── frontend/
+│   ├── public/
+│   │   └── index.html
+│   ├── src/
+│   │   ├── components/
+│   │   │   ├── Camera.jsx
+│   │   │   ├── ShapePanel.jsx
+│   │   │   ├── SaveStatus.jsx
+│   │   │   └── Header.jsx
+│   │   ├── hooks/
+│   │   │   ├── useShapes.js
+│   │   │   └── useAutosave.js
+│   │   ├── utils/
+│   │   │   └── api.js
+│   │   ├── App.jsx
+│   │   ├── index.js
+│   │   └── index.css
+│   ├── package.json
+│   └── tailwind.config.js
+├── backend/
+│   ├── app.py
+│   ├── requirements.txt
+│   └── shapes.json
+└── README.md
+```
 
+## Frontend Setup Commands
 
-### 3. Configure Tailwind CSS
+1. **Create React App:**
+```bash
+npx create-react-app frontend
+cd frontend
+```
 
-Update `tailwind.config.js`:
+2. **Install Tailwind CSS:**
+```bash
+npm install -D tailwindcss@^3.4.0 postcss@^8.4.0 autoprefixer@^10.4.0
+npx tailwindcss init -p
+```
+
+2. **Install Additional Dependencies:**
+```bash
+npm install axios uuid
+```
+
+3. **Add Google Fonts to public/index.html:**
+```html
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Jacquard+12&family=Jacquard+24&display=swap" rel="stylesheet">
+```
+
+## Backend Setup Commands
+
+1. **Create Python Virtual Environment:**
+```bash
+cd backend
+```
+
+2. **Install Dependencies:**
+```bash
+pip install flask flask-cors
+pip freeze > requirements.txt
+```
+
+## Configuration Files
+
+### tailwind.config.js
 ```javascript
-/** @type {import('tailwindcss').Config} */
-export default {
+module.exports = {
   content: [
-    "./index.html",
-    "./src/**/*.{js,ts,jsx,tsx}",
+    "./src/**/*.{js,jsx,ts,tsx}",
   ],
   theme: {
     extend: {
+      colors: {
+        'text-gray': '#A3A3A3',
+        'bg-gray': '#D9D9D9',
+      },
       fontFamily: {
-        'jacquard-12': ['Jacquard 12', 'serif'],
-        'jacquard-24': ['Jacquard 24', 'serif'],
+        'jacquard-12': ['Jacquard 12', 'cursive'],
+        'jacquard-24': ['Jacquard 24', 'cursive'],
       },
     },
   },
@@ -25,82 +92,79 @@ export default {
 }
 ```
 
-Update `src/index.css`:
+### src/index.css
 ```css
-@import url('https://fonts.googleapis.com/css2?family=Jacquard+12&family=Jacquard+24&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-```
 
-### 4. Project Structure
-```
-src/
-├── components/
-│   ├── Camera.jsx           # Main camera view with shape drawing
-│   ├── ShapesList.jsx       # Sidebar with shapes list
-│   ├── Header.jsx           # Navigation header
-│   └── SaveStatus.jsx       # Autosave status indicator
-├── hooks/
-│   ├── useShapes.js         # Shape management logic
-│   ├── useAutosave.js       # Autosave functionality
-│   └── useAPI.js           # API calls for backend
-├── utils/
-│   ├── shapeUtils.js        # Shape calculation utilities
-│   └── fileUtils.js         # File download/upload utilities
-├── App.jsx
-├── main.jsx
-└── index.css
-```
+body {
+  margin: 0;
+  font-family: 'Jacquard 24', cursive;
+  background-color: #D9D9D9;
+  color: #A3A3A3;
+}
 
-### 5. Key Features Implemented
+.gothic-text {
+  font-family: 'Jacquard 12', cursive;
+}
 
-- **Shape Drawing**: Click to add points, automatically close polygons
-- **Shape Management**: Add, rename, delete, and activate shapes
-- **Visual Feedback**: Active shapes in blue with control points, inactive in gray
-- **Autosave**: Every 5 seconds with status indicator
-- **File Operations**: Download JSON locally, upload to overwrite
-- **Responsive Design**: Clean, professional interface matching the design
-
-### 6. Run the Development Server
-```bash
-npm run dev
-```
-
-### 7. Backend API Endpoints Expected
-
-The frontend expects these endpoints:
-- `GET /api/shapes` - Fetch current shapes
-- `POST /api/shapes` - Save shapes (autosave)
-- `PUT /api/shapes` - Upload/overwrite shapes
-
-### 8. Shape Data Format
-```json
-{
-  "shapes": [
-    {
-      "id": "unique-id",
-      "name": "Shape 1",
-      "points": [[x1, y1], [x2, y2], ...],
-      "isActive": false
-    }
-  ]
+.small-text {
+  font-family: 'Jacquard 24', cursive;
 }
 ```
 
-## Development Notes
+## Key Features Implementation
 
-- Uses modern React hooks and functional components
-- Tailwind CSS for styling with custom fonts
-- Modular architecture with custom hooks for state management
-- Constants defined at the top of each file
-- Clean separation of concerns between UI and logic
-- Responsive design that works on desktop and mobile
+### Constants Structure
+Each component will have constants at the top:
+- Colors (ACTIVE_BLUE, INACTIVE_GRAY, etc.)
+- Timing (AUTOSAVE_INTERVAL = 5000)
+- API endpoints
+- Default values
+
+### Shape Management
+- Shapes stored as arrays of points with metadata
+- Active shape tracking with visual indicators
+- Click-to-add-point functionality on camera feed
+- Sidebar shape list with rename capability
+
+### Autosave System
+- 5-second interval autosave to backend
+- Visual indicators for save status
+- Local save/upload functionality
+- Automatic shape loading on startup
+
+### Styling
+- Tailwind classes for consistent spacing
+- Custom CSS for shape overlays
+- Google Fonts integration
+- No borders, only spacer lines
+
+## Running the Project
+
+### Start Backend:
+```bash
+cd backend
+source venv/bin/activate
+python app.py
+```
+
+### Start Frontend:
+```bash
+cd frontend
+npm start
+```
+
+## API Endpoints
+- GET /api/shapes - Load shapes
+- POST /api/shapes - Save shapes
+- The backend will serve shapes.json and handle CORS
 
 ## Next Steps
+1. Run the setup commands above
+2. I'll provide the main component files
+3. Test the shape creation and autosave functionality
+4. Adjust styling as needed
 
-3. Build your backend to match the expected API endpoints
-4. Test the drawing and save functionality
-5. Deploy both frontend and backend
-
-The application will automatically load shapes from the server on startup and provide a seamless motion detection region configuration experience.
+The project follows React best practices with custom hooks for state management, component separation, and proper error handling.

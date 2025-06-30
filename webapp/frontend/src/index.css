@@ -1,0 +1,18 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  margin: 0;
+  font-family: 'Jacquard 24', cursive;
+  background-color: #D9D9D9;
+  color: #A3A3A3;
+}
+
+.gothic-text {
+  font-family: 'Jacquard 12', cursive;
+}
+
+.small-text {
+  font-family: 'Jacquard 24', cursive;
+}
